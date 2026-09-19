@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Nexxa Hub · Protected</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;-webkit-tap-highlight-color:transparent}
+body{background:linear-gradient(135deg,#050d1a 0%,#0a1628 100%);color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:rgba(15,30,51,.8);backdrop-filter:blur(12px);border:1px solid #1e3a5f;border-radius:16px;padding:32px 24px;max-width:420px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.icon{font-size:3rem;color:#FF8C00;margin-bottom:16px}
+h1{font-size:1.3rem;color:#FF8C00;margin-bottom:8px;font-weight:800}
+p{color:#888;font-size:.85rem;margin-bottom:24px}
+input{width:100%;background:#050d1a;color:#fff;border:1px solid #1e3a5f;border-radius:10px;padding:14px;font-size:.9rem;font-family:monospace;margin-bottom:12px;text-align:center;letter-spacing:2px}
+input:focus{outline:none;border-color:#FF8C00}
+.btns{display:flex;gap:8px}
+.btns button{flex:1;border:none;padding:14px;border-radius:10px;cursor:pointer;font-weight:700;font-size:.95rem;transition:all .15s}
+.btns button:active{transform:scale(.97)}
+#getKeyBtn{background:linear-gradient(135deg,#FF8C00,#FF5722);color:#fff}
+#continueBtn{background:linear-gradient(135deg,#4FC3F7,#2196F3);color:#fff}
+.btns button:disabled{opacity:.5;cursor:wait}
+.error{background:rgba(231,76,60,.15);border:1px solid #e74c3c;color:#e74c3c;padding:12px;border-radius:8px;margin-top:12px;font-size:.85rem;font-weight:600}
+.success{background:rgba(46,204,113,.1);border:1px solid #2ecc71;color:#2ecc71;padding:10px;border-radius:8px;margin-top:12px;font-size:.8rem}
+pre{text-align:left;background:#050d1a;color:#4FC3F7;padding:14px;border-radius:10px;margin-top:16px;font-family:'Consolas',monospace;font-size:.75rem;max-height:400px;overflow:auto;white-space:pre;border:1px solid #1e3a5f}
+#notif{position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#050d1a 0%,#0a1628 100%);border:2px solid #FF8C00;border-radius:12px;padding:14px 20px;color:#fff;font-weight:600;font-size:.9rem;box-shadow:0 8px 32px rgba(255,140,0,.3);transform:translateX(400px);transition:transform .4s cubic-bezier(.5,1.6,.4,1);z-index:9999;max-width:300px}
+#notif.show{transform:translateX(0)}
+#notif .titulo{color:#FF8C00;font-weight:800;font-size:1rem;margin-bottom:4px}
+#notif .sub{color:#bbb;font-size:.8rem;font-weight:400}
+</style>
+</head>
+<body>
+<div id="notif">
+<div class="titulo">Welcome to the hub</div>
+<div class="sub">Protected By Nexxa Hub</div>
+</div>
+
+<div class="card">
+<div class="icon">🔒</div>
+<h1>Protected By Nexxa Hub</h1>
+<p>Enter Key</p>
+<input type="text" id="key" placeholder="Enter Key" maxlength="40">
+<div class="btns">
+<button id="getKeyBtn">Get Key</button>
+<button id="continueBtn">Continue</button>
+</div>
+<div id="msg"></div>
+<pre id="code" style="display:none"></pre>
+</div>
+
+<script>
+const KEY_DATA_URL = window.location.pathname + "/keydata";
+const RAW_URL = window.location.pathname + "/raw";
+const key = document.getElementById("key");
+const getKeyBtn = document.getElementById("getKeyBtn");
+const continueBtn = document.getElementById("continueBtn");
+const msg = document.getElementById("msg");
+const code = document.getElementById("code");
+const notif = document.getElementById("notif");
+
+let getKeyLink = "";
+let notifyOnEnter = false;
+
+async function loadKeyData() {
+  try {
+    const r = await fetch(KEY_DATA_URL);
+    if (r.ok) {
+      const d = await r.json();
+      getKeyLink = d.getKeyUrl || "";
+      notifyOnEnter = d.notifyOnEnter === true;
+    }
+  } catch (e) {}
+}
+loadKeyData();
+
+function mostrarNotif() {
+  if (!notifyOnEnter) return;
+  notif.classList.add("show");
+  setTimeout(() => {
+    notif.classList.remove("show");
+  }, 5000);
+}
+
+getKeyBtn.onclick = async () => {
+  if (!getKeyLink) {
+    msg.innerHTML = '<div class="error">No Get Key link available</div>';
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(getKeyLink);
+    const orig = getKeyBtn.textContent;
+    getKeyBtn.textContent = "✅ Copied";
+    setTimeout(() => getKeyBtn.textContent = orig, 1500);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = getKeyLink;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    const orig = getKeyBtn.textContent;
+    getKeyBtn.textContent = "✅ Copied";
+    setTimeout(() => getKeyBtn.textContent = orig, 1500);
+  }
+};
+
+continueBtn.onclick = async () => {
+  const k = key.value.trim();
+  if (!k) {
+    msg.innerHTML = '<div class="error">Enter a key</div>';
+    return;
+  }
+  continueBtn.disabled = true;
+  continueBtn.textContent = "Verifying...";
+  msg.innerHTML = "";
+  try {
+    const r = await fetch(RAW_URL + "?k=" + encodeURIComponent(k));
+    if (r.status === 403) {
+      msg.innerHTML = '<div class="error">Incorrect Password</div>';
+      continueBtn.disabled = false;
+      continueBtn.textContent = "Continue";
+      return;
+    }
+    if (!r.ok) {
+      msg.innerHTML = '<div class="error">Error loading</div>';
+      continueBtn.disabled = false;
+      continueBtn.textContent = "Continue";
+      return;
+    }
+    const txt = await r.text();
+    code.textContent = txt;
+    code.style.display = "block";
+    msg.innerHTML = '<div class="success">✅ Unlocked</div>';
+    continueBtn.disabled = false;
+    continueBtn.textContent = "Continue";
+    mostrarNotif();
+  } catch (e) {
+    msg.innerHTML = '<div class="error">Error: ' + e.message + '</div>';
+    continueBtn.disabled = false;
+    continueBtn.textContent = "Continue";
+  }
+};
+</script>
+</body>
+</html>
